@@ -1,2 +1,5 @@
-native-smp-secondary.patch
-sheng-platform-power.patch
+# SM7435/Parrot XNU bring-up. Apply after the ARM64 architecture patch series.
+# Source anchor inherited from the UniXNU SM8550 SMP proof-of-concept.
+# The only active SoC-specific patch is the eight-CPU MPIDR/reset fix.
+# Not hardware-validated with XNU on dizi; keep SMP opt-in during bring-up.
+sm7435-smp-secondary.patch
