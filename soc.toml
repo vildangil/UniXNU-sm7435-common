@@ -1,12 +1,12 @@
-"schema_version" = 2
+schema_version = 2
 
-["soc"]
-"name" = "sm8550"
-"description" = "Qualcomm SM8550"
-"source_repository" = "https://github.com/ianchb/sm8550-mainline"
-"source_revision" = "42f3b40c702abbc37c3a04c95af008cd283aeaf3"
+[soc]
+name = "sm7435"
+description = "Qualcomm SM7435 (Parrot): preliminary ARM64 CPU/GICv3/PSCI bring-up"
+source_repository = "https://github.com/LineageOS/android_kernel_xiaomi_sm7435-devicetrees"
+source_revision = "849a8a76b0959f7e7c12eb67081591248b2f8e7b"
 
-
-["components"]
-"include" = ["ArmCpu", "ArmDTPlatform", "Adreno740", "AdrenoMetal"]
-
+# Select only common ARM64 components known to implement the same interfaces.
+# SM8550-specific Adreno 740, GMU, GPU SMMU, UFS and power hooks are excluded.
+[components]
+include = ["ArmCpu", "ArmDTPlatform"]
