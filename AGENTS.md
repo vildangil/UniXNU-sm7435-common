@@ -1,35 +1,31 @@
-# Agent instructions
+# Agent instructions: UniXNU SM7435 / Parrot
 
-This repository owns shared SM8550 resources and platform operations.
-Keep board peripherals, firmware selection, partition layout, and power
-policy in the device repository. Preserve runtime source filenames,
-classes, symbols, bundle IDs, and protocol IDs.
+This fork is **Qualcomm SM7435** SoC common support, not SM8550 support.
+The device repository is vildangil/UniXNU-Dizi-Ruan; do not modify its
+known-working Mu-Silicium EDK2, PMIC buttons or image layout as part of CPU
+driver bring-up.
 
-Read these UniXNU pages before editing:
+Always verify hardware details against:
+- LineageOS/android_kernel_xiaomi_sm7435-devicetrees at qcom/parrot.dtsi
+  commit 849a8a76b0959f7e7c12eb67081591248b2f8e7b
+- UniXNU-Dizi-Ruan/data/dizi-fdt-observed.json (dizi; not ruan).
+- UniXNU/ArmCpu and UniXNU device-tree/SoC support documentation.
 
-1. [Porting](https://unixnu.com/porting/)
-2. [Device repositories](https://unixnu.com/porting/device-repository)
-3. [Components](https://unixnu.com/reference/components)
-4. [Device trees](https://unixnu.com/porting/device-tree)
-5. [Driver matching](https://unixnu.com/drivers/device-tree-matching)
+Do NOT activate or copy `kits/Sm8550Platform`, sheng power hooks,
+Adreno740/AdrenoMetal, SM8550 SMMU, UFS, GPU or clock addresses.
+Those source files are historic and deliberately unreferenced.
 
-Read the selected component README, build interface, and relevant source
-before adding a capability. Search `components.toml` in UniXNU for existing
-implementations. Select by interface, hardware requirements, OS ABI, and
-board dependencies.
+`patches/xnu/series` is ordered and contains only SM7435-specific
+changes. Native secondary-CPU startup is experimental and must be tested
+only after DarwinBoot actually enters the XNU kernel. Keep cpus=1 as the
+device bring-up default, and never claim SMP was hardware verified from
+a build-only result.
 
-For kernel work, read the selected OS profile, XNU source, and ordered
-patches. For migration, read the
-[migration guide](https://unixnu.com/porting/migration).
+Do not enable any GitHub Actions `push` or `pull_request` build trigger.
+Report separate levels of evidence: reference source, compilation,
+UEFI behavior, kernel handoff, and actual multi-core execution.
 
-Run builds from the UniXNU checkout:
-
-```sh
-./unixnu defconfig sheng_defconfig --device ../UniXNU-sheng
-./unixnu tree --device ../UniXNU-sheng
-./unixnu build kernel --device ../UniXNU-sheng
-```
-
-Report commands, results, required local inputs, and hardware checkpoints.
-Keep the documentation site in UniXNU. Write concise English describing
-current behavior. Use direct statements and ordinary punctuation.
+Read upstream:
+https://unixnu.com/porting/soc-support/
+https://unixnu.com/porting/device-tree/
+https://unixnu.com/porting/drivers/
