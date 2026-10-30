@@ -9,7 +9,7 @@ This is the SoC counterpart for [UniXNU-Dizi-Ruan](https://github.com/vildangil/
 | `soc.toml` | Qualcomm SM7435 identity; only generic `ArmCpu` and `ArmDTPlatform` selected | Defined |
 | `dts/sm7435.dtsi` | Eight MPIDRs 0x000..0x700; 4 E + 4 P; PSCI SMC; GICv3 MMIO/stride; architectural timer | Source-matched; XNU untested |
 | `configs/sm7435.config` | Generic ARM64 CPU, DT and timer capabilities | Source configuration only |
-| `patches/xnu/sm7435-smp-secondary.patch` | Eight-CPU capacity and MPIDR affinity handling, adapted from SM8550 | Not compiled/tested against selected XNU baseline |
+| `patches/xnu/sm7435-smp-secondary.patch` | Eight-CPU capacity and unconditional Aff1-aware reset-vector comparison | Source-checked, hardware SMP untested |
 | `patches/xnu/series` | SM7435 SMP patch only | Experimental, must not claim multi-core boot |
 
 The original fork's `dts/sm8550.dtsi`, `configs/sm8550.config`, `kits/Sm8550Platform/`, and `patches/xnu/sheng-platform-power.patch` are **legacy reference files only**. They remain for code comparison. None is selected by `soc.toml`, `configs/sm7435.config`, or `patches/xnu/series`. Do not compile them as SM7435 drivers.
@@ -28,6 +28,33 @@ The original fork's `dts/sm8550.dtsi`, `configs/sm8550.config`, `kits/Sm8550Plat
 | GICR stride | 0x20000 | 0x40000 |
 | PSCI | `arm,psci-1.0`, SMC | `arm,psci-1.0`, SMC |
 | Timer | 19.2 MHz; virtual timer PPI 11 / INTID 27 | 19.2 MHz |
+
+## 2026-10-31 Aff1 reset-vector correction
+
+The pinned SoC patch now preserves **all 16 low affinity bits** of
+`MPIDR_EL1` in `osfmk/arm64/start.s` **regardless of
+`HAS_CLUSTER`**. In Qualcomm Parrot, all eight CPU IDs are
+`0x000, 0x100, ..., 0x700`; masking only `0xFF` would
+incorrectly make all eight look like CPU0 during the XNU
+`ResetHandlerData` / `CPU_PHYS_ID` match.
+
+The previous patch used `#if HAS_CLUSTER || defined(BCM2837)`.
+There was no confirmation that either macro was defined in this
+SM7435 build, so the fallback retained the old broken `#0xFF`
+mask. The new SoC-only patch is unconditional:
+`and x0, x15, #0xFFFF`. It preserves the **physical**
+MPIDR affinity ID for comparison against the CPU's recorded
+physical ID; it is *not* meant to turn `0x100` into the logical
+CPU index `1`. That distinction remains the job of the
+kernel/ADT topology mapper.
+
+The patch was checked with an independent `git apply --check`
+fixture and all eight MPIDR values were evaluated for uniqueness.
+It is a **source-level repair, not a hardware SMP confirmation**.
+Do not claim secondaries are online or set a multicore default
+until the platform's PSCI CPU_ON, per-core exception entry,
+GIC redistributor and timer delivery are checked on real dizi.
+The board's safe default stays `cpus=1`; `cpus=2` is opt-in.
 
 ## Realistic XNU multi-core plan
 
