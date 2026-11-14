@@ -1,5 +1,11 @@
 # SM7435/Parrot XNU bring-up. Apply after the ARM64 architecture patch series.
 # Source anchor inherited from the UniXNU SM8550 SMP proof-of-concept.
-# The only active SoC-specific patch is the eight-CPU MPIDR/reset fix.
 # Not hardware-validated with XNU on dizi; keep SMP opt-in during bring-up.
+#
+# sheng-platform-power.patch only adds a hook guarded by XNU_SHENG_PMGR, which
+# dizi leaves unset, so it compiles to nothing. It stays in the series because
+# UniXNU's OS-profile zzz-boot-progress.patch expects that block in bsd_init.c.
+sheng-platform-power.patch
 sm7435-smp-secondary.patch
+# SM7435 runs under the Qualcomm hypervisor, which traps EL1 physical-timer access.
+sm7435-virtual-timer-only.patch
