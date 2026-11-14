@@ -9,15 +9,18 @@ This is the SoC counterpart for [UniXNU-Dizi-Ruan](https://github.com/vildangil/
 | `soc.toml` | Qualcomm SM7435 identity; only generic `ArmCpu` and `ArmDTPlatform` selected | Defined |
 | `dts/sm7435.dtsi` | Eight MPIDRs 0x000..0x700; 4 E + 4 P; PSCI SMC; GICv3 MMIO/stride; architectural timer | Source-matched; XNU untested |
 | `configs/sm7435.config` | Generic ARM64 CPU, DT and timer capabilities | Source configuration only |
-| `patches/xnu/sm7435-smp-secondary.patch` | Eight-CPU capacity and unconditional Aff1-aware reset-vector comparison | Source-checked, hardware SMP untested |
-| `patches/xnu/series` | SM7435 SMP patch only | Experimental, must not claim multi-core boot |
+| `patches/xnu/sm7435-smp-secondary.patch` | Eight-CPU capacity and unconditional Aff1-aware reset-vector comparison | Applies and boots with `cpus=1`; hardware SMP untested |
+| `patches/xnu/sm7435-virtual-timer-only.patch` | Removes XNU's `CNTP_CTL_EL0` write; the hypervisor traps EL1 physical-timer access | Hardware-verified on dizi |
+| `patches/xnu/series` | `sheng-platform-power.patch` (compiled out), SMP, virtual timer | Boots XNU to the root mount on dizi |
 
-The original fork's `dts/sm8550.dtsi`, `configs/sm8550.config`, `kits/Sm8550Platform/`, and `patches/xnu/sheng-platform-power.patch` are **legacy reference files only**. They remain for code comparison. None is selected by `soc.toml`, `configs/sm7435.config`, or `patches/xnu/series`. Do not compile them as SM7435 drivers.
+The original fork's `dts/sm8550.dtsi`, `configs/sm8550.config` and `kits/Sm8550Platform/` are **legacy reference files only**. They remain for code comparison and are not selected by `soc.toml` or `configs/sm7435.config`. Do not compile them as SM7435 drivers.
+
+`patches/xnu/sheng-platform-power.patch` stays in the series for one reason: UniXNU's OS-profile `zzz-boot-progress.patch` expects the block it adds to `bsd_init.c`. The block is guarded by `XNU_SHENG_PMGR`, which dizi leaves unset, so it compiles to nothing.
 
 ## Evidence and differences from SM8550
 
 - Qualcomm Parrot device tree: [`qcom/parrot.dtsi`](https://github.com/LineageOS/android_kernel_xiaomi_sm7435-devicetrees/blob/849a8a76b0959f7e7c12eb67081591248b2f8e7b/qcom/parrot.dtsi) at commit `849a8a76b0959f7e7c12eb67081591248b2f8e7b`.
-- Dizi bootloader FDT-derived addresses: [`data/dizi-fdt-observed.json`](https://github.com/vildangil/UniXNU-Dizi-Ruan/blob/main/data/dizi-fdt-observed.json).
+- Dizi bootloader FDT: [`Resources/DTBs/dizi.dts`](https://github.com/vildangil/Mu-Silicium/blob/main/Resources/DTBs/dizi.dts) in Mu-Silicium (8 GiB unit).
 
 | Resource | SM7435 / Parrot | SM8550 / sheng |
 | --- | --- | --- |
@@ -28,6 +31,17 @@ The original fork's `dts/sm8550.dtsi`, `configs/sm8550.config`, `kits/Sm8550Plat
 | GICR stride | 0x20000 | 0x40000 |
 | PSCI | `arm,psci-1.0`, SMC | `arm,psci-1.0`, SMC |
 | Timer | 19.2 MHz; virtual timer PPI 11 / INTID 27 | 19.2 MHz |
+
+## 2026-11-14 hardware result on dizi
+
+With this series, the [UniXNU-Dizi-Ruan](https://github.com/vildangil/UniXNU-Dizi-Ruan) board config and the iPadOS 17.7.11 profile, `fastboot boot` on a real dizi with `cpus=1` gives:
+
+1. UEFI loads the UniXNU payload and DarwinBoot hands off to XNU.
+2. XNU's entry code runs, the MMU comes on, and `arm_init` continues.
+3. XNU panicked in `fiq_context_init` on `msr CNTP_CTL_EL0` (undefined instruction): the Qualcomm hypervisor traps EL1 physical-timer access. `sm7435-virtual-timer-only.patch` drops that write; XNU only uses the virtual timer here, and the built kernel has no other physical-timer access.
+4. XNU then runs through VM, IOKit and AMFI and stops at `Failed to mount root device` (IOKitBSDInit.cpp:984), as expected without a root filesystem.
+
+The `start.s` hunk of `sm7435-smp-secondary.patch` also got trailing context lines; without them `git apply` refused it.
 
 ## 2026-10-31 Aff1 reset-vector correction
 
@@ -60,8 +74,8 @@ The board's safe default stays `cpus=1`; `cpus=2` is opt-in.
 
 The upstream [`ArmCpu` driver](https://github.com/UniXNU/ArmCpu/blob/main/ArmCpu.cpp) already has paths for GICv3 redistributors, architectural timer, PSCI `CPU_ON`, SGIs/IPIs and secondary `IOCPU` registration. Its early SMP code still uses `sheng-smp` boot arguments and contains device-specific assumptions; this **is not yet a validated SM7435 multi-core driver**.
 
-1. Build the real patched XNU and `ArmCpu` for the exact compatible OS ABI. The SoC patch must apply cleanly; do not assume it does.
-2. Implement an **on-device verified** memory map, XNU ADT and DarwinBoot handoff; boot XNU initially with `cpus=1`.
+1. ~~Build the real patched XNU and `ArmCpu` for the exact compatible OS ABI.~~ Done: the series applies and builds for iPadOS 17.7.11.
+2. ~~Implement an on-device verified memory map, XNU ADT and DarwinBoot handoff; boot XNU with `cpus=1`.~~ Done on 2026-11-14 up to the root mount.
 3. Validate GICD/GICR ID readbacks, PSCI version, per-core MPIDR and timer on the device.
 4. Enable secondaries **one at a time**, recording PSCI return values, redistributor ownership, timer/IPI delivery and boot progress. Do not force SMMU bypass or replace Qualcomm power/clock registers with SM8550 values.
 5. Only then consider general `8 CPU` support. GPU, UFS, touch, display and userland are separate problems.
