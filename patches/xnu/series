@@ -9,3 +9,5 @@ sheng-platform-power.patch
 sm7435-smp-secondary.patch
 # SM7435 runs under the Qualcomm hypervisor, which traps EL1 physical-timer access.
 sm7435-virtual-timer-only.patch
+# Two clusters (4 E + 4 P) for XNU's scheduler; from the ruan port / UniXNU-sm8250-common.
+sm7435-type-clusters.patch
