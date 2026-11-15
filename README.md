@@ -9,9 +9,10 @@ This is the SoC counterpart for [UniXNU-Dizi-Ruan](https://github.com/vildangil/
 | `soc.toml` | Qualcomm SM7435 identity; only generic `ArmCpu` and `ArmDTPlatform` selected | Defined |
 | `dts/sm7435.dtsi` | Eight MPIDRs 0x000..0x700; 4 E + 4 P; PSCI SMC; GICv3 MMIO/stride; architectural timer | Source-matched; XNU untested |
 | `configs/sm7435.config` | Generic ARM64 CPU, DT and timer capabilities | Source configuration only |
-| `patches/xnu/sm7435-smp-secondary.patch` | Eight-CPU capacity and unconditional Aff1-aware reset-vector comparison | Applies and boots with `cpus=1`; hardware SMP untested |
+| `patches/xnu/sm7435-smp-secondary.patch` | Eight-CPU capacity and unconditional Aff1-aware reset-vector comparison | Applies and boots with `cpus=1`; boots with `cpus=8` |
 | `patches/xnu/sm7435-virtual-timer-only.patch` | Removes XNU's `CNTP_CTL_EL0` write; the hypervisor traps EL1 physical-timer access | Hardware-verified on dizi |
-| `patches/xnu/series` | `sheng-platform-power.patch` (compiled out), SMP, virtual timer | Boots XNU to the root mount on dizi |
+| `patches/xnu/sm7435-type-clusters.patch` | Two CPU clusters (4 E + 4 P) and Edge scheduler defaults, from the ruan port / UniXNU-sm8250-common | Hardware-verified on dizi: all 8 cores |
+| `patches/xnu/series` | `sheng-platform-power.patch` (compiled out), SMP, virtual timer, clusters | Boots XNU with 8 cores to launchd on dizi |
 
 The original fork's `dts/sm8550.dtsi`, `configs/sm8550.config` and `kits/Sm8550Platform/` are **legacy reference files only**. They remain for code comparison and are not selected by `soc.toml` or `configs/sm7435.config`. Do not compile them as SM7435 drivers.
 
@@ -42,6 +43,13 @@ With this series, the [UniXNU-Dizi-Ruan](https://github.com/vildangil/UniXNU-Diz
 4. XNU then runs through VM, IOKit and AMFI and stops at `Failed to mount root device` (IOKitBSDInit.cpp:984), as expected without a root filesystem.
 
 The `start.s` hunk of `sm7435-smp-secondary.patch` also got trailing context lines; without them `git apply` refused it.
+
+## 2026-11-14 SMP on dizi
+
+Starting a second core reset the tablet until XNU knew the two clusters: `sm7435-type-clusters.patch` sets
+`MAX_CPU_CLUSTERS 2` and `__ARM_AMP__`, and the board DTS gives each CPU `unixnu,die-cluster-id` (0 for the A55s,
+1 for the A78s) and `unixnu,cluster-core-id`. With both, `cpus=2` and `cpus=8` (`smp=1 armcpu-spi-ipi=1
+armcpu-self-ipi=1`) reach the same point as one core.
 
 ## 2026-10-31 Aff1 reset-vector correction
 
@@ -76,6 +84,7 @@ The upstream [`ArmCpu` driver](https://github.com/UniXNU/ArmCpu/blob/main/ArmCpu
 
 1. ~~Build the real patched XNU and `ArmCpu` for the exact compatible OS ABI.~~ Done: the series applies and builds for iPadOS 17.7.11.
 2. ~~Implement an on-device verified memory map, XNU ADT and DarwinBoot handoff; boot XNU with `cpus=1`.~~ Done on 2026-11-14 up to the root mount.
+3. ~~Validate secondary CPU startup.~~ Done: all 8 cores with the cluster patch.
 3. Validate GICD/GICR ID readbacks, PSCI version, per-core MPIDR and timer on the device.
 4. Enable secondaries **one at a time**, recording PSCI return values, redistributor ownership, timer/IPI delivery and boot progress. Do not force SMMU bypass or replace Qualcomm power/clock registers with SM8550 values.
 5. Only then consider general `8 CPU` support. GPU, UFS, touch, display and userland are separate problems.
